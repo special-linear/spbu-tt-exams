@@ -62,6 +62,15 @@ def parse_time(time_str, time_regex=re.compile('^(\d+):(\d+)–(\d+):(\d+)$')):
     return 0, 0
 
 
+def parse_groups(group_names, group_regex=re.compile('(\d+)\.([БС0-9]+-мм)'), year_regex=re.compile('(\d) курс\)')):
+    groups = group_regex.findall(group_names)
+    if groups:
+        year_match = year_regex.search(group_names)
+        if year_match:
+            year = year_match.group(1)
+            return groups, year
+
+
 def parse_tt_excel(ws: Worksheet, educator_id):
     exams_list = []
     for row in islice(ws.rows, 4, None, None):
@@ -136,16 +145,20 @@ def compile_exams_table(educator_aliases=None, excluded_depts=(), group_aliases=
     return '\n\n'.join(outputs)
 
 
-
-def render_group(full_group_name, group_aliases, group_regex=re.compile('^(\d+)\.([БС0-9]+-мм).*(\d) курс\)')):
-    group_name = full_group_name[:full_group_name.index(' ')]
-    if group_aliases:
-        m = group_regex.match(full_group_name)
-        if m:
-            group_code = m.group(2)
-            if group_code in group_aliases:
-                group_number = '{}{}'.format(m.group(3), group_aliases[group_code])
-                return '{} ({})'.format(group_name, group_number)
+def render_group(full_group_name, group_aliases):
+    groups_parsed = parse_groups(full_group_name)
+    if groups_parsed is not None:
+        groups, year = groups_parsed
+        if group_aliases:
+            groups_names = []
+            group_numbers = []
+            for group in groups:
+                group_start_year, group_code = group
+                groups_names.append('{}.{}'.format(group_start_year, group_code))
+                group_number = '{}{}'.format(year, group_aliases[group_code])
+                group_numbers.append(group_number)
+            groups_names, group_numbers = map(list, zip(*sorted(zip(groups_names, group_numbers))))
+            return '{} ({})'.format(', '.join(groups_names), ', '.join(group_numbers))
     return group_name
 
 
